@@ -1,43 +1,50 @@
-# 🚀 Omega-Prime / Syndicate Deployer Gene
-You are Omega-Prime AI, orchestrator of autonomous deployment.  
-Your mission: generate a full GitHub repo that can **deploy both a token and an Infinity Earnings Matrix (IEM)** to SKALE mainnet with **no owner**.
+# 🚀 Omega-Prime Syndicate Deployer Gene (Relayer Edition)
 
-## Tasks
-1. Create Solidity contracts in `contracts/`:
-   - `FutureSkaleTokenOwnerless.sol` (ERC20, ownerless, mint supply to initial holder)
-   - `InfinityEarningsMatrix.sol` (routes earnings 60/30/10 to vaults)
+## Mission
+Deploy **FutureSkaleTokenOwnerless** + **InfinityEarningsMatrix (IEM)** on SKALE Mainnet **without private keys or GitHub secrets**.  
+All deployments go through the **Sponsored Relayer Gene**.
 
-2. Create Hardhat config `hardhat.config.js`:
-   - Use Solidity `^0.8.20`
-   - Network: `skale` with `url` + `accounts` from env
+---
 
-3. Create deploy script in `scripts/deploy.js`:
-   - Deploy Token first
-   - Deploy IEM second, linked to Token
-   - Print both contract addresses
+## Components
 
-4. Create GitHub Actions workflow `.github/workflows/deploy.yml`:
-   - Trigger on `push` to `main` and manual run
-   - Install Node + Hardhat + OpenZeppelin
-   - Use secrets `DEPLOYER_KEY` and `SKALE_RPC`
-   - Run deploy script
+### 1. Contracts
+- **FutureSkaleTokenOwnerless.sol**
+  - Ownerless ERC20, fixed supply
+  - Initial supply → 1B tokens
+  - Initial holder → `0xE38FB59ba3AEAbE2AD0f6FB7Fb84453F6d145D23`
 
-5. Output ✅ Deployment complete.
+- **InfinityEarningsMatrix.sol**
+  - Agents: Looter / MEV Master / Arbitrader
+  - Earnings split:
+    - 60% → Reinvest Pool
+    - 30% → Upgrade Fund
+    - 10% → BountyNova Redistribution
+  - Vault controlled by **AI Orchestrator**
 
-## Contract 1 — FutureSkaleTokenOwnerless.sol
+---
+
+### 2. Relayer Gene
+- **Relayer.sol**
+  - Contract that accepts deployment payloads
+  - Executes `create` or `create2` on behalf of Copilot
+  - Costs are **sponsored** (no gas needed from deployer)
+  - Anyone (any AI agent) can push deployments to it
+
 ```solidity
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+contract RelayerGene {
+    event ContractDeployed(address indexed newContract, bytes32 salt);
 
-contract FutureSkaleTokenOwnerless is ERC20 {
-    constructor(
-        string memory name_,
-        string memory symbol_,
-        uint256 initialSupply_,
-        address initialHolder_
-    ) ERC20(name_, symbol_) {
-        _mint(initialHolder_, initialSupply_ * (10 ** decimals()));
+    function deploy(bytes memory bytecode, bytes32 salt) external returns (address) {
+        address addr;
+        assembly {
+            addr := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
+            if iszero(extcodesize(addr)) { revert(0, 0) }
+        }
+        emit ContractDeployed(addr, salt);
+        return addr;
     }
 }
